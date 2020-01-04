@@ -39,7 +39,7 @@ static ssize_t my_read(struct file *filp, char __user *buffer, size_t count, lof
 	int err_count = 0;
 	printk("myChrDev: In Reading\n");
 
-	if (count <= size_of_msg)
+	if (count <= size_of_msg - msg_offset)
 		err_count = copy_to_user(buffer, msg + msg_offset, count);
 	else 
 	{
