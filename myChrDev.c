@@ -6,6 +6,7 @@
 #include <linux/device.h>
 #include <linux/err.h>
 #include <linux/uaccess.h>
+#include <linux/wait.h>
 
 #define MINOR_FIRST 0
 #define MINOR_COUNT 1
@@ -19,7 +20,7 @@ static size_t size_of_msg=0;
 char msg[BUFFER_SIZE]={0};
 int msg_offset = 0;
 static dev_t my_device_number;
-
+static DECLARE_WAIT_QUEUE_HEAD(wq);
 static int my_open(struct inode *, struct file *);
 static int my_release(struct inode *, struct file *);
 static ssize_t my_write(struct file *, const char __user *, size_t count, loff_t *pos);
@@ -39,13 +40,15 @@ static ssize_t my_read(struct file *filp, char __user *buffer, size_t count, lof
 	int err_count = 0;
 	printk("myChrDev: In Reading\n");
 
-	if (count <= size_of_msg - msg_offset)
-		err_count = copy_to_user(buffer, msg + msg_offset, count);
-	else 
-	{
-		return 0;
+	
+		
+	if (size_of_msg - msg_offset < count)
+	{	
+		wait_event_interruptible(wq,size_of_msg - msg_offset >= count );
+		
 	}
 
+	err_count = copy_to_user(buffer, msg + msg_offset, count);
 	if( err_count == 0 )
 	{
 		printk(KERN_INFO "myChrDev: Sent string %s to the user\n",buffer);
@@ -65,8 +68,9 @@ static ssize_t my_write(struct file *filp, const char __user *buffer, size_t cou
 	{
 		return -EACCES;
 	}
-
+	
 	size_of_msg = strlen(msg);
+	wake_up_interruptible(&wq);
 	printk(KERN_INFO "myChrDev: receive %zu charaters for the user %s\n",count,msg);
 	return count;
 }
